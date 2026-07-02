@@ -205,7 +205,7 @@ def GoogleSearchTool(
         return f"Error during Google search: {e}"
 
 # @tool
-def DuckDuckGoSearchTool(args, query: str, read_content: bool = True, return_num: int = 5, mini_handler=None):
+def DuckDuckGoSearchTool(args, query: str, mini_handler, read_content: bool = True, return_num: int = 5):
     """
     Use the DDGS (DuckDuckGo Search) to get search results. Optionally, fetch content from the links and summarize.
 

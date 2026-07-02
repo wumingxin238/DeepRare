@@ -5,7 +5,7 @@ import random
 import time
 from transformers import AutoModel, AutoTokenizer, AutoModelForSequenceClassification
 
-from utils import set_up_args, set_up_data
+from utils import set_up_args, set_up_data, create_openai_api
 from diagnosisGene import make_diagnosis
 from api.interface import Openai_api, gemini_api, deepseek_api, claude_api
 
@@ -15,7 +15,7 @@ class LLM_handler:
     def __init__(self, args):
         
         if args.model == "openai":
-            self.handler = Openai_api(args.openai_apikey, args.openai_model)
+            self.handler = create_openai_api(args)
         elif args.model == "gemini":
             self.handler = gemini_api(args.gemini_apikey, args.gemini_model)
         elif args.model == "deepseek":
@@ -45,7 +45,7 @@ def main():
     # Set up the LLM Model
     handler = LLM_handler(args).handler
     
-    Openai = Openai_api(args.openai_apikey, args.openai_model)
+    Openai = create_openai_api(args)
 
     mini_handler = Openai.mini_completion
     embedding_handler = Openai.get_embedding

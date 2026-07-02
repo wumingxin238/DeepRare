@@ -463,6 +463,7 @@ Based on all the above, enumerate the top 5 most likely rare disease diagnoses f
                 patient_info=patient_info,
                 preliminary_diagnosis=final_diagnois,
                 api_interface=handler,
+                model=getattr(handler, "model", "unknown"),
             )
         final_diagnois = result
 

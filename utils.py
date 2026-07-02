@@ -39,7 +39,15 @@ def set_up_args():
     
     # API keys
     parser.add_argument('--openai_apikey', type=str, default='')
-    parser.add_argument('--openai_model', type=str, default='gpt-4o', choices=['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini', 'o1-mini'])
+    parser.add_argument('--openai_base_url', type=str, default='')
+    parser.add_argument('--openai_model', type=str, default='gpt-4o')
+    parser.add_argument('--openai_mini_model', type=str, default='',
+                        help='Mini model for summarization; defaults to openai_model (use same Qwen for local vLLM)')
+    parser.add_argument('--openai_embedding_model', type=str, default='text-embedding-3-small')
+    parser.add_argument('--openai_embedding_apikey', type=str, default='',
+                        help='Separate API key for embeddings; defaults to openai_apikey')
+    parser.add_argument('--openai_embedding_base_url', type=str, default='',
+                        help='Separate base URL for embeddings (RDS DB uses text-embedding-3-small)')
     parser.add_argument('--gemini_apikey', type=str, default='')
     parser.add_argument('--gemini_model', type=str, default='', choices=['gemini-2.0-pro-exp', 'gemini-2.0-flash-exp', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash-8b', 'gemini-1.5-flash'])
     parser.add_argument('--claude_apikey', type=str, default='')
@@ -66,7 +74,8 @@ def set_up_args():
     # Set up the results folder
     results_folder = os.path.join(args.results_folder, args.dataset_name)
     if args.model == 'openai':
-        results_folder = os.path.join(results_folder, args.openai_model)
+        model_tag = args.openai_model.replace('/', '_')
+        results_folder = os.path.join(results_folder, model_tag)
     elif args.model == 'gemini':
         results_folder = os.path.join(results_folder, args.gemini_model)
     elif args.model == 'deepseek':
@@ -208,3 +217,17 @@ def cosine_similarity(a, b):
     a = np.array(a)
     b = np.array(b)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def create_openai_api(args):
+    from api.interface import Openai_api
+
+    return Openai_api(
+        api_key=args.openai_apikey,
+        model=args.openai_model,
+        base_url=args.openai_base_url or None,
+        mini_model=args.openai_mini_model or None,
+        embedding_model=args.openai_embedding_model,
+        embedding_api_key=args.openai_embedding_apikey or args.openai_apikey,
+        embedding_base_url=args.openai_embedding_base_url or None,
+    )

@@ -2,29 +2,74 @@ from openai import OpenAI
 import anthropic
 import google.generativeai as genai
 
-class Openai_api:
-    def __init__(self, api_key, model):
 
-        self.client = OpenAI(
-            api_key=api_key
+def _sanitize_api_key(api_key, name="api_key"):
+    if api_key is None:
+        return "EMPTY"
+    key = str(api_key).strip()
+    if not key:
+        return "EMPTY"
+    try:
+        key.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ValueError(
+            f"{name} must contain only ASCII characters (use your real sk-... key, "
+            f"not a Chinese placeholder)."
+        ) from exc
+    return key
+
+
+class Openai_api:
+    def __init__(
+        self,
+        api_key,
+        model,
+        base_url=None,
+        mini_model=None,
+        embedding_model="text-embedding-3-small",
+        embedding_api_key=None,
+        embedding_base_url=None,
+    ):
+        api_key = _sanitize_api_key(api_key, "openai_apikey")
+        embedding_api_key = _sanitize_api_key(
+            embedding_api_key or api_key, "openai_embedding_apikey"
         )
+
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = OpenAI(**client_kwargs)
         self.model = model
+        self.mini_model = mini_model or model
+        self.embedding_model = embedding_model
+
+        embed_kwargs = {"api_key": embedding_api_key}
+        embed_base = embedding_base_url or base_url
+        if embed_base:
+            embed_kwargs["base_url"] = embed_base
+        if embedding_base_url and embedding_base_url != base_url:
+            self.embed_client = OpenAI(**embed_kwargs)
+        elif embedding_api_key and embedding_api_key != api_key:
+            self.embed_client = OpenAI(**embed_kwargs)
+        else:
+            self.embed_client = self.client
 
         self.gpt4_tokens = 0
         self.chatgpt_tokens = 0
         self.gpt_4o_mini_tokens = 0
 
     def get_completion(self, system_prompt, prompt, seed=42):
-        try:       
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                seed=seed,
-                messages=[
+        try:
+            kwargs = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
-                ]
-            )
-            
+                ],
+            }
+            if self.model.startswith("gpt-"):
+                kwargs["seed"] = seed
+            completion = self.client.chat.completions.create(**kwargs)
             return str(completion.choices[0].message.content)
         except Exception as e:
             print(e)
@@ -43,23 +88,26 @@ class Openai_api:
             return text[:1000]
     
     def mini_completion(self, system_prompt, prompt, seed=42):
-        try:       
-            completion = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                seed=seed,
-                messages=[
+        try:
+            kwargs = {
+                "model": self.mini_model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
-                ]
-            )
-            
+                ],
+            }
+            # Local OpenAI-compatible servers (e.g. vLLM) may not support seed.
+            if self.mini_model.startswith("gpt-"):
+                kwargs["seed"] = seed
+            completion = self.client.chat.completions.create(**kwargs)
             return str(completion.choices[0].message.content)
         except Exception as e:
             print(e)
             return None
         
-    def get_embedding(self, text: str, model="text-embedding-3-small") -> list[float]:
-        return self.client.embeddings.create(input=[text], model=model).data[0].embedding
+    def get_embedding(self, text: str, model=None) -> list[float]:
+        model = model or self.embedding_model
+        return self.embed_client.embeddings.create(input=[text], model=model).data[0].embedding
 
 class deepseek_api:
     def __init__(self, api_key, model):

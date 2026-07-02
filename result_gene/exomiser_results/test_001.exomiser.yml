@@ -1,0 +1,64 @@
+analysis:
+  genomeAssembly: GRCh37
+  outputOptions:
+    outputFormat:
+    - TSV
+    - HTML
+    outputPrefix: /export/home/zhangzhuoyu/DeepRare/exomiser_results/test_001.phenix
+  frequencySources:
+  - THOUSAND_GENOMES
+  - TOPMED
+  - UK10K
+  - ESP_AA
+  - ESP_EA
+  - ESP_ALL
+  - GNOMAD_E_AFR
+  - GNOMAD_E_AMR
+  - GNOMAD_E_EAS
+  - GNOMAD_E_NFE
+  - GNOMAD_E_SAS
+  - GNOMAD_G_AFR
+  - GNOMAD_G_AMR
+  - GNOMAD_G_EAS
+  - GNOMAD_G_NFE
+  - GNOMAD_G_SAS
+  pathogenicitySources:
+  - POLYPHEN
+  - MUTATION_TASTER
+  - SIFT
+  analysisMode: PASS_ONLY
+  inheritanceModes:
+    AUTOSOMAL_DOMINANT: 0.1
+    AUTOSOMAL_RECESSIVE_HOM_ALT: 0.1
+    AUTOSOMAL_RECESSIVE_COMP_HET: 2.0
+    X_DOMINANT: 0.1
+    X_RECESSIVE_HOM_ALT: 0.1
+    X_RECESSIVE_COMP_HET: 2.0
+    MITOCHONDRIAL: 0.2
+  steps:
+  - failedVariantFilter: {}
+  - variantEffectFilter:
+      remove:
+      - FIVE_PRIME_UTR_EXON_VARIANT
+      - FIVE_PRIME_UTR_INTRON_VARIANT
+      - THREE_PRIME_UTR_EXON_VARIANT
+      - THREE_PRIME_UTR_INTRON_VARIANT
+      - NON_CODING_TRANSCRIPT_EXON_VARIANT
+      - NON_CODING_TRANSCRIPT_INTRON_VARIANT
+      - CODING_TRANSCRIPT_INTRON_VARIANT
+      - UPSTREAM_GENE_VARIANT
+      - DOWNSTREAM_GENE_VARIANT
+      - INTERGENIC_VARIANT
+      - REGULATORY_REGION_VARIANT
+  - frequencyFilter:
+      maxFrequency: 1.0
+  - pathogenicityFilter:
+      keepNonPathogenic: true
+  - inheritanceFilter: {}
+  - omimPrioritiser: {}
+  - hiPhivePrioritiser: {}
+  vcf: ./data/vcf/test_001.vcf
+  hpoIds:
+  - HP:0001250
+  - HP:0000365
+  - HP:0001974

@@ -1,7 +1,35 @@
 import json
+import os
 from datasets import load_dataset
-from typing import Tuple
+from typing import Tuple, List, Dict, Any
 import pandas as pd
+
+
+def _load_rarebench_data(dataset_name: str, dataset_path: str) -> List[Dict[str, Any]]:
+    local_jsonl = os.path.join('dataset', 'RareBench', 'data', f'{dataset_name}.jsonl')
+    if os.path.exists(local_jsonl):
+        records = []
+        with open(local_jsonl, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+        return records
+
+    try:
+        hf_data = load_dataset(dataset_path, dataset_name, split='test', trust_remote_code=True)
+        return [row for row in hf_data]
+    except RuntimeError as e:
+        if 'Dataset scripts are no longer supported' in str(e):
+            raise RuntimeError(
+                f"Cannot load RareBench split '{dataset_name}' via HuggingFace scripts. "
+                "Run:\n"
+                "  mkdir -p dataset/RareBench && "
+                "wget -O dataset/RareBench/data.zip "
+                "https://huggingface.co/datasets/chenxz/RareBench/resolve/main/data.zip && "
+                "unzip -o dataset/RareBench/data.zip -d dataset/RareBench"
+            ) from e
+        raise
 
 
 class RarePrompt:
@@ -34,7 +62,7 @@ class RareDataset():
         self.disease_mapping = json.load(open(args.disease_mapping, "r", encoding="utf-8-sig"))
 
         if self.dataset_name in ["RAMEDIS", "MME", "HMS", "LIRICAL"]: 
-            self.data = load_dataset(self.dataset_path, self.dataset_name, split='test', trust_remote_code=True)
+            self.data = _load_rarebench_data(self.dataset_name, self.dataset_path)
         elif self.dataset_name == 'Xinhua':
             self.data = pd.read_csv('dataset/xinhua_test_0331.csv')
         elif self.dataset_name == 'MIMIC':
@@ -121,6 +149,29 @@ class RareDataset():
                     patient.append((phenotype, disease, phenotype_list_, phenotype_id, vcf_path))
                 else:
                     patient.append((phenotype, disease, phenotype_list_, phenotype_id))
+        elif self.dataset_name in ['case']:
+            for p in self.data.iterrows():
+                hpo_raw = p[1]['hpo']
+                if isinstance(hpo_raw, str) and hpo_raw.strip().startswith('['):
+                    phenotype_list = eval(hpo_raw)
+                else:
+                    phenotype_list = [x.strip() for x in str(hpo_raw).split('|') if x.strip()]
+
+                disease_raw = p[1].get('disease', '[]')
+                if pd.isna(disease_raw) or disease_raw == '':
+                    disease_list = []
+                elif isinstance(disease_raw, str) and disease_raw.strip().startswith('['):
+                    disease_list = eval(disease_raw)
+                else:
+                    disease_list = [str(disease_raw)]
+
+                phenotype_list_ = [self.phenotype_mapping[phenotype] for phenotype in phenotype_list if phenotype in self.phenotype_mapping]
+                disease_list = [self.disease_mapping[disease] for disease in disease_list if disease in self.disease_mapping]
+                phenotype_id = [phenotype for phenotype in phenotype_list if phenotype in self.phenotype_mapping]
+                phenotype = ", ".join(phenotype_list_)
+                disease = ", ".join(disease_list)
+                vcf_path = p[1]['vcf_path']
+                patient.append((phenotype, disease, phenotype_list_, phenotype_id, vcf_path))
                 
         return patient
             
