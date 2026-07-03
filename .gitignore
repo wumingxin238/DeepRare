@@ -24,4 +24,7 @@ database/*
 exomizer-*/
 exomiser_results/*
 result/
+containers/staging/
+containers/.remote-build/
+containers/*.sif
 dataset/*

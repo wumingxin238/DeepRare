@@ -1,0 +1,68 @@
+# DeepRare inference image (HPO / HPO+VCF). No LLM weights inside.
+# Remote build clones from GitHub (%post) — no %files upload needed.
+# Build: REMOTE_BUILD=1 bash containers/build.sh deeprare
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+%labels
+    Author DeepRare
+    Version 1.0
+    Description DeepRare inference env (local Qwen via separate qwen-server.sif)
+
+%environment
+    export DEEPRARE_ROOT=/opt/deeprare
+    export PATH=/opt/conda/envs/deeprare/bin:$PATH
+    export CONDA_DEFAULT_ENV=deeprare
+    export PYTHONUNBUFFERED=1
+    export TOKENIZERS_PARALLELISM=false
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl git wget bzip2 \
+        libglib2.0-0 libsm6 libxext6 libxrender1
+    rm -rf /var/lib/apt/lists/*
+
+    git clone --depth 1 --branch ${DEEPRARE_GIT_REF} ${DEEPRARE_GIT_URL} /opt/deeprare
+    rm -rf /opt/deeprare/.git
+
+    wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+    bash /tmp/miniconda.sh -b -p /opt/conda
+    rm /tmp/miniconda.sh
+    . /opt/conda/etc/profile.d/conda.sh
+
+    conda create -n deeprare python=3.11 -y
+    conda activate deeprare
+
+    conda install -y -c conda-forge \
+        openjdk=21 \
+        pyarrow \
+        pandas \
+        lxml \
+        greenlet \
+        grpcio \
+        pyyaml
+
+    pip install -U pip wheel
+    pip install torch==2.6.0 torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/cu124
+
+    cd /opt/deeprare
+    pip install -r requirements.txt --prefer-binary || pip install -r requirements.txt
+
+    python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+    java -version
+
+%runscript
+    cd /opt/deeprare
+    exec python "$@"
+
+%help
+    DeepRare inference container (no model weights, no Exomiser DB inside).
+    Example:
+      apptainer exec --nv -B \$PWD:/work -B /data/exomiser:/opt/deeprare/exomiser-cli-14.0.0 \\
+        deeprare.sif main_gene.py --help
+    Use containers/run-inference-gene.sh for the full local-Qwen workflow.
