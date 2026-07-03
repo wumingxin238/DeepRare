@@ -29,9 +29,9 @@ From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
     git clone --depth 1 --branch ${DEEPRARE_GIT_REF} ${DEEPRARE_GIT_URL} /opt/deeprare
     rm -rf /opt/deeprare/.git
 
-    wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
-    bash /tmp/miniconda.sh -b -p /opt/conda
-    rm /tmp/miniconda.sh
+    wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p /opt/conda
+    rm /tmp/miniforge.sh
     . /opt/conda/etc/profile.d/conda.sh
 
     conda create -n deeprare python=3.11 -y
