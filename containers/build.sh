@@ -12,8 +12,10 @@
 #   tmux new -s sif-build
 #   conda activate singce
 #   cd ~/DeepRare && sed -i 's/\r$//' containers/*.sh containers/*.def
-#   REMOTE_BUILD=1 bash containers/build.sh 2>&1 | tee containers/build-remote.log
-#   # Ctrl+b d to detach; tmux attach -t sif-build
+#   # Build smaller image first (~5GB):
+#   REMOTE_BUILD=1 bash containers/build.sh qwen-server 2>&1 | tee containers/build-qwen.log
+#   REMOTE_BUILD=1 bash containers/build.sh deeprare 2>&1 | tee containers/build-remote.log
+#   # Sylabs free tier: 60 min total per build (compile + upload). Ctrl+b d to detach.
 
 set -euo pipefail
 

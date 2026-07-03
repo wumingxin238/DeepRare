@@ -2,7 +2,7 @@
 # Remote build clones from GitHub (%post) — no %files upload needed.
 # Build: REMOTE_BUILD=1 bash containers/build.sh deeprare
 Bootstrap: docker
-From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+From: nvidia/cuda:12.4.1-base-ubuntu22.04
 
 %labels
     Author DeepRare
@@ -17,7 +17,8 @@ From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
     export TOKENIZERS_PARALLELISM=false
 
 %post
-    set -eu
+    #!/bin/bash
+    set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
 
     apt-get update
@@ -31,30 +32,34 @@ From: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
     wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh
     bash /tmp/miniforge.sh -b -p /opt/conda
-    rm /tmp/miniforge.sh
+    rm -f /tmp/miniforge.sh
     . /opt/conda/etc/profile.d/conda.sh
 
     conda create -n deeprare python=3.11 -y
     conda activate deeprare
 
-    conda install -y -c conda-forge \
-        openjdk=21 \
-        pyarrow \
-        pandas \
-        lxml \
-        greenlet \
-        grpcio \
-        pyyaml
+    # Java only via conda; Python deps via pip (single torch install).
+    conda install -y -c conda-forge openjdk=21
 
-    pip install -U pip wheel
-    pip install torch==2.6.0 torchvision torchaudio \
+    pip install --no-cache-dir -U pip wheel
+    pip install --no-cache-dir \
+        torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
         --index-url https://download.pytorch.org/whl/cu124
 
     cd /opt/deeprare
-    pip install -r requirements.txt --prefer-binary || pip install -r requirements.txt
+    REQ=containers/requirements-inference.txt
+    if [[ ! -f "$REQ" ]]; then
+        grep -Ev '^(torch|torchvision|torchaudio|triton|nvidia-|#|$)' requirements.txt > /tmp/requirements-inference.txt
+        REQ=/tmp/requirements-inference.txt
+    fi
+    pip install --no-cache-dir -r "$REQ" --prefer-binary
 
     python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
     java -version
+
+    pip cache purge
+    conda clean -afy
+    rm -rf /root/.cache /tmp/*
 
 %runscript
     cd /opt/deeprare
