@@ -14,7 +14,7 @@
 #   cd ~/DeepRare && sed -i 's/\r$//' containers/*.sh containers/*.def
 #   # Build smaller image first (~5GB):
 #   REMOTE_BUILD=1 bash containers/build.sh qwen-server 2>&1 | tee containers/build-qwen.log
-#   REMOTE_BUILD=1 bash containers/build.sh deeprare 2>&1 | tee containers/build-remote.log
+#   # If build OK but pull 401: singularity remote login && PULL_ONLY=1 bash containers/build.sh qwen-server
 #   # Sylabs free tier: 60 min total per build (compile + upload). Ctrl+b d to detach.
 
 set -euo pipefail
@@ -113,6 +113,47 @@ rsync_qwen() {
   echo "    script: $QWEN_SCRIPT"
 }
 
+library_uri() {
+  local name="$1"
+  local user="${SYLABS_USER:-wmx238}"
+  local collection="${SYLABS_COLLECTION:-deeprare}"
+  local tag="${SYLABS_TAG:-latest}"
+  if [[ -z "$user" ]]; then
+    user="$("$SING" remote status 2>&1 | sed -n 's/.*Logged in as: \([^ <]*\).*/\1/p' | head -1)"
+  fi
+  if [[ -z "$user" ]]; then
+    echo "ERROR: set SYLABS_USER (your Sylabs namespace, e.g. wmx238)" >&2
+    exit 1
+  fi
+  echo "library://${user}/${collection}/${name}:${tag}"
+}
+
+check_remote_login() {
+  if ! "$SING" remote status 2>&1 | grep -qiE 'verified|connected|logged'; then
+    echo "ERROR: Sylabs remote not logged in." >&2
+    echo "  singularity remote login    # token from https://cloud.sylabs.io/tokens" >&2
+    exit 1
+  fi
+}
+
+pull_from_library() {
+  local name="$1"
+  local out="$CONTAINERS/${name}.sif"
+  local uri
+  uri="$(library_uri "$name")"
+  echo "==> Pulling $uri -> $out"
+  if "$SING" pull --force "$out" "$uri"; then
+    echo "OK: $out"
+    ls -lh "$out"
+    return 0
+  fi
+  echo "ERROR: pull failed (HTTP 401 = expired/invalid token)." >&2
+  echo "  1) singularity remote logout cloud.sylabs.io && singularity remote login" >&2
+  echo "  2) PULL_ONLY=1 REMOTE_BUILD=1 bash containers/build.sh $name" >&2
+  echo "  Or download from https://cloud.sylabs.io → Library → $uri" >&2
+  return 1
+}
+
 build_one() {
   local name="$1"
   local def="$CONTAINERS/${name}.def"
@@ -148,6 +189,13 @@ build_one() {
     echo "    REMOTE_BUILD=1 bash containers/build.sh $name" >&2
     exit 1
   fi
+  if [[ "${REMOTE_BUILD:-0}" == "1" ]]; then
+    check_remote_login
+    if [[ "${PULL_ONLY:-0}" == "1" ]]; then
+      pull_from_library "$name" || exit 1
+      return 0
+    fi
+  fi
   BUILD_ARGS=()
   if [[ "${REMOTE_BUILD:-0}" == "1" ]]; then
     if [[ "$SING" == *apptainer* ]] && "$SING" build --help 2>&1 | grep -qi "Apptainer"; then
@@ -165,7 +213,20 @@ build_one() {
   elif "$SING" build --help 2>&1 | grep -q fakeroot; then
     BUILD_ARGS+=(--fakeroot)
   fi
-  if "$SING" build "${BUILD_ARGS[@]}" "$out" "$build_def_rel"; then
+
+  if [[ "${REMOTE_BUILD:-0}" == "1" ]]; then
+    local uri
+    uri="$(library_uri "$name")"
+    echo "    push to Sylabs Library: $uri"
+    echo "    (create collection '${SYLABS_COLLECTION:-deeprare}' at https://cloud.sylabs.io/library first)"
+    if "$SING" build "${BUILD_ARGS[@]}" "$uri" "$build_def_rel"; then
+      echo "==> Remote build complete (in Library)"
+    else
+      echo "Remote build failed." >&2
+      exit 1
+    fi
+    pull_from_library "$name" || exit 1
+  elif "$SING" build "${BUILD_ARGS[@]}" "$out" "$build_def_rel"; then
     echo "OK: $out"
   else
     echo "Build failed." >&2
