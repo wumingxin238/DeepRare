@@ -17,8 +17,7 @@ From: nvidia/cuda:12.4.1-base-ubuntu22.04
     export TOKENIZERS_PARALLELISM=false
 
 %post
-    #!/bin/bash
-    set -euo pipefail
+    set -eu
     export DEBIAN_FRONTEND=noninteractive
 
     apt-get update
@@ -48,7 +47,7 @@ From: nvidia/cuda:12.4.1-base-ubuntu22.04
 
     cd /opt/deeprare
     REQ=containers/requirements-inference.txt
-    if [[ ! -f "$REQ" ]]; then
+    if [ ! -f "$REQ" ]; then
         grep -Ev '^(torch|torchvision|torchaudio|triton|nvidia-|#|$)' requirements.txt > /tmp/requirements-inference.txt
         REQ=/tmp/requirements-inference.txt
     fi
