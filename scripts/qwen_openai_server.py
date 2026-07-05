@@ -25,7 +25,7 @@ import torch
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 app = FastAPI()
 _model = None
@@ -54,6 +54,7 @@ def load_model(model_id: str, *, fp16: bool = True, four_bit: bool = False) -> N
 
     kwargs: Dict[str, Any] = {"trust_remote_code": True, "low_cpu_mem_usage": True}
     if four_bit:
+        from transformers import BitsAndBytesConfig
         kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,

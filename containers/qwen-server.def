@@ -32,7 +32,7 @@ From: nvidia/cuda:12.4.1-base-ubuntu22.04
 
     wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh
     bash /tmp/miniforge.sh -b -p /opt/conda
-    rm /tmp/miniforge.sh
+    rm -f /tmp/miniforge.sh
     . /opt/conda/etc/profile.d/conda.sh
 
     conda create -n qwen3_infer python=3.10 -y
@@ -41,24 +41,43 @@ From: nvidia/cuda:12.4.1-base-ubuntu22.04
     conda install -y -c conda-forge sentencepiece --no-update-deps
 
     pip install --no-cache-dir -U pip wheel
-    pip install --no-cache-dir torch==2.1.2 torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu121
     pip install --no-cache-dir \
+        torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+        --index-url https://download.pytorch.org/whl/cu121
+
+    cat >/tmp/pip-constraints.txt <<'EOF'
+torch==2.1.2
+torchvision==0.16.2
+torchaudio==2.1.2
+EOF
+
+    # fp16 only in container (see run-qwen-server.sh); skip bitsandbytes — it upgrades torch to 2.12+.
+    pip install --no-cache-dir -c /tmp/pip-constraints.txt \
         "numpy>=1.26,<2" \
         "transformers>=4.51.0,<5.0" \
         "tokenizers>=0.21,<0.22" \
         accelerate \
-        bitsandbytes \
         tqdm \
         "huggingface_hub>=0.26,<1.0" \
+        safetensors \
+        regex \
+        pyyaml \
         fastapi \
-        uvicorn
+        uvicorn \
+        pydantic \
+        starlette \
+        anyio \
+        httpx \
+        filelock \
+        packaging \
+        requests
 
     python -c "import torch, transformers; print('OK', torch.__version__, transformers.__version__)"
 
     pip cache purge
     conda clean -afy
-    rm -rf /root/.cache /tmp/*
+    rm -rf /root/.cache
+    rm -f /tmp/pip-constraints.txt
 
 %runscript
     exec python /opt/deeprare/scripts/qwen_openai_server.py "$@"
