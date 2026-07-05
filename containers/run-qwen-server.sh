@@ -5,6 +5,11 @@
 #   export QWEN_MODEL_DIR=/path/to/Qwen3-14B   # local HF model folder
 #   export CUDA_VISIBLE_DEVICES=5
 #   bash containers/run-qwen-server.sh
+#
+# CentOS 7 without user namespaces: .sif may not run — use qwen3_infer instead:
+#   conda activate qwen3_infer
+#   export QWEN_MODEL=/path/to/snapshot
+#   CUDA_VISIBLE_DEVICES=6 python scripts/qwen_openai_server.py --model "$QWEN_MODEL" --port 8000 --host 0.0.0.0 --fp16
 
 set -euo pipefail
 
@@ -21,10 +26,28 @@ GPU="${CUDA_VISIBLE_DEVICES:-0}"
 HOST="${QWEN_HOST:-0.0.0.0}"
 MOUNT_MODEL="/models/Qwen3-14B"
 
-if command -v apptainer >/dev/null 2>&1; then
-  SING=apptainer
-else
-  SING=singularity
+find_singularity() {
+  if [[ -n "${APPTAINER_BIN:-}" && -x "$APPTAINER_BIN" ]]; then
+    echo "$APPTAINER_BIN"
+    return 0
+  fi
+  local d
+  for d in \
+    "$(command -v singularity 2>/dev/null || true)" \
+    "$(command -v apptainer 2>/dev/null || true)" \
+    "$HOME/miniconda3/envs/singce/bin/singularity" \
+    "/export/home/$(whoami)/miniconda3/envs/singce/bin/singularity"; do
+    if [[ -n "$d" && -x "$d" ]]; then
+      echo "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if ! SING="$(find_singularity)"; then
+  echo "ERROR: singularity/apptainer not found (conda activate singce?)" >&2
+  exit 1
 fi
 
 if [[ "$SIF" != library://* ]] && [[ ! -f "$SIF" ]]; then
@@ -44,7 +67,8 @@ echo "GPU       : $CUDA_VISIBLE_DEVICES"
 echo "Listen    : http://${HOST}:${PORT}/v1"
 echo
 
-exec $SING exec --nv \
+# singularity run uses %runscript; exec would treat --model as a binary name
+exec "$SING" run --nv \
   -B "$MODEL_DIR:$MOUNT_MODEL:ro" \
   "$SIF" \
   --model "$MOUNT_MODEL" \
