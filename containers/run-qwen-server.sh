@@ -9,7 +9,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEFAULT_LIBRARY="library://wmx238/deeprare/qwen-server:latest"
 SIF="${QWEN_SIF:-$ROOT/containers/qwen-server.sif}"
+if [[ "$SIF" != library://* ]] && [[ ! -f "$SIF" ]]; then
+  SIF="$DEFAULT_LIBRARY"
+  echo "Note: local .sif missing, using Library: $SIF"
+fi
 MODEL_DIR="${QWEN_MODEL_DIR:?Set QWEN_MODEL_DIR to your local Qwen3-14B folder}"
 PORT="${VLLM_PORT:-8000}"
 GPU="${CUDA_VISIBLE_DEVICES:-0}"
@@ -22,8 +27,8 @@ else
   SING=singularity
 fi
 
-if [[ ! -f "$SIF" ]]; then
-  echo "Missing $SIF — run: bash containers/build.sh qwen-server" >&2
+if [[ "$SIF" != library://* ]] && [[ ! -f "$SIF" ]]; then
+  echo "Missing $SIF — build or set QWEN_SIF=library://wmx238/deeprare/qwen-server:latest" >&2
   exit 1
 fi
 if [[ ! -d "$MODEL_DIR" ]]; then

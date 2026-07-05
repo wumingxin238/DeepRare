@@ -142,15 +142,24 @@ pull_from_library() {
   local uri
   uri="$(library_uri "$name")"
   echo "==> Pulling $uri -> $out"
-  if "$SING" pull --force "$out" "$uri"; then
+  check_remote_login
+  if "$SING" pull --force "$out" "$uri" \
+      || "$SING" pull --force --library https://library.sylabs.io "$out" "$uri"; then
     echo "OK: $out"
     ls -lh "$out"
     return 0
   fi
-  echo "ERROR: pull failed (HTTP 401 = expired/invalid token)." >&2
-  echo "  1) singularity remote logout cloud.sylabs.io && singularity remote login" >&2
-  echo "  2) PULL_ONLY=1 REMOTE_BUILD=1 bash containers/build.sh $name" >&2
-  echo "  Or download from https://cloud.sylabs.io → Library → $uri" >&2
+  echo "" >&2
+  echo "WARN: pull to local .sif failed (401 on PRIVATE library is common)." >&2
+  echo "  Image IS in Sylabs Library: $uri" >&2
+  echo "" >&2
+  echo "  Fix pull (pick one):" >&2
+  echo "    A) cloud.sylabs.io → Library → deeprare/qwen-server → make Public → re-login →" >&2
+  echo "       PULL_ONLY=1 REMOTE_BUILD=1 bash containers/build.sh $name" >&2
+  echo "    B) Web UI → Download → save as containers/${name}.sif" >&2
+  echo "    C) Run from Library (no local file):" >&2
+  echo "       export QWEN_SIF=$uri" >&2
+  echo "       bash containers/run-qwen-server.sh" >&2
   return 1
 }
 
@@ -220,12 +229,16 @@ build_one() {
     echo "    push to Sylabs Library: $uri"
     echo "    (create collection '${SYLABS_COLLECTION:-deeprare}' at https://cloud.sylabs.io/library first)"
     if "$SING" build "${BUILD_ARGS[@]}" "$uri" "$build_def_rel"; then
-      echo "==> Remote build complete (in Library)"
+      echo "==> Remote build complete (in Library): $uri"
     else
       echo "Remote build failed." >&2
       exit 1
     fi
-    pull_from_library "$name" || exit 1
+    if ! pull_from_library "$name"; then
+      echo ""
+      echo "Build succeeded in Library; local pull skipped (see above)."
+      echo "  export QWEN_SIF=$uri"
+    fi
   elif "$SING" build "${BUILD_ARGS[@]}" "$out" "$build_def_rel"; then
     echo "OK: $out"
   else
