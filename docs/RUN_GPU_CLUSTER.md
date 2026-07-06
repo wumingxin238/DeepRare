@@ -157,3 +157,52 @@ tmux attach -t deeprare-infer
 ```
 
 参考输出对比：`docs/test_001_comparison.md`
+
+---
+
+## 8. 结果汇总统计
+
+推理完成后，汇总 `result_gene/` 下所有 `patient_*.json`：
+
+```bash
+conda activate deeprare
+cd ~/DeepRare
+
+python scripts/summarize_gene_results.py
+```
+
+结果目录结构为 `result_gene/<数据集>/<模型>/patient_*.json`。同一 VCF（如 `test_001`）若改了 `dataset/cases.csv` 里的表型再跑，文件名仍可能是 `patient_0.json`，脚本会用 **case_key**（`样本 | 表型`）区分，并在末尾打印 Overview。
+
+导出 CSV 表格（便于对照查看）：
+
+```bash
+python scripts/summarize_gene_results.py \
+  --result-dir result_gene \
+  --dataset case \
+  --csv result_gene/summary_case.csv
+```
+
+汇总全部数据集（不只 `case`）时，将 `--dataset` 设为空字符串：
+
+```bash
+python scripts/summarize_gene_results.py --dataset '' --csv result_gene/summary_all.csv
+```
+
+只看某一个模型输出文件夹（该目录下直接有 `patient_*.json`）：
+
+```bash
+# 方式 1：--run-dir 指定子目录
+python scripts/summarize_gene_results.py \
+  --run-dir result_gene/case/Qwen_Qwen3-14B
+
+# 方式 2：--result-dir 直接指向该文件夹（效果相同）
+python scripts/summarize_gene_results.py \
+  --result-dir result_gene/case/Qwen_Qwen3-14B
+
+# 导出该文件夹的 CSV
+python scripts/summarize_gene_results.py \
+  --run-dir result_gene/case/Qwen_Qwen3-14B \
+  --csv result_gene/summary_qwen_case.csv
+```
+
+输出包含：数据集、case_key、模型、病例编号、表型、VCF、Exomiser Top 基因、AI Top5 诊断、耗时、JSON 路径。
