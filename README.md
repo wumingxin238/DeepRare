@@ -36,6 +36,10 @@ For more detailed about our pipeline, please refer to our paper.
 
 **Note:** GPU is optional - models can run on CPU with slower performance. Exomiser tool requires the specified minimum resources for optimal functionality.
 
+### 在本 GPU 集群上运行（Conda + 本地 Qwen3-14B）
+
+见 **[docs/RUN_GPU_CLUSTER.md](docs/RUN_GPU_CLUSTER.md)**（中文简要说明）。
+
 ## LLM API Key Requirements
 The system supports multiple LLM providers. You need to obtain an API key from at least one of the following:
 
